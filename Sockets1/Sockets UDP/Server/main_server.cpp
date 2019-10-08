@@ -27,38 +27,84 @@ void printWSErrorAndExit(const char *msg)
 
 void server(int port)
 {
-	// TODO-1: Winsock init
+	// Winsock init
 	WSADATA wsaData;
-	int iResult = WSAStartup(MAKEWORD(2, 2), &wsaData);
-	if (iResult != NO_ERROR)
-	{
-		// Log and handle error
-		return;
+	if (WSAStartup(MAKEWORD(2, 2), &wsaData) != NO_ERROR) {
+		printWSErrorAndExit("WSAStartup");
 	}
+	std::cout << "WSAStartup done" << std::endl;
 
-	// TODO-2: Create socket (IPv4, datagrams, UDP
+	// Create socket (IPv4, datagrams, UDP
+	SOCKET s = socket(AF_INET, SOCK_DGRAM, 0);
+	if (s == INVALID_SOCKET) {
+		printWSErrorAndExit("socket");
+	}
+	std::cout << "socket done" << std::endl;
 
-	SOCKET sockymocky = socket(AF_INET, SOCK_DGRAM, 0);
+	// Reuse address
+	int enable = 1;
+	int result = setsockopt(s, SOL_SOCKET, SO_REUSEADDR, (const char*)&enable, sizeof(int));
+	if (result == SOCKET_ERROR) {
+		printWSErrorAndExit("setsockopt");
+	}
+	std::cout << "setsockopt SO_REUSEADDR done" << std::endl;
 
-	// TODO-3: Force address reuse
+	// Address (server)
+	struct sockaddr_in serverAddr;
+	serverAddr.sin_family = AF_INET; // IPv4
+	serverAddr.sin_addr.S_un.S_addr = INADDR_ANY; // Any address, will be localhost
+	serverAddr.sin_port = htons(port); // Port
 
-	struct sockaddr_in bindAddr;
-	bindAddr.sin_family = AF_INET; // IPv4
-	bindAddr.sin_port = htons(port); // Port
+	// Bind socket
+	int bindRes = bind(s, (struct sockaddr *)&serverAddr, sizeof(serverAddr));
+	if (bindRes == SOCKET_ERROR) {
+		printWSErrorAndExit("bind");
+	}
+	std::cout << "bind done on port " << port << std::endl;
 
-	// TODO-4: Bind to a local address
+	// Server string
+	std::string pongString("Pong");
+
+	// Input buffer
+	const int inBufferLen = 1300;
+	char inBuffer[inBufferLen];
+
+	// From address (client)
+	struct sockaddr fromAddr;
+	int fromAddrLen = sizeof(fromAddr);
 
 	while (true)
 	{
-		// TODO-5:
-		// - Receive 'ping' packet from a remote host
-		// - Answer with a 'pong' packet
-		// - Control errors in both cases
+		std::cout << "Waiting for client data... " << std::flush;
+
+		// Receive
+		int bytes = recvfrom(s, inBuffer, inBufferLen, 0, &fromAddr, &fromAddrLen);
+		if (bytes >= 0)
+		{
+			std::cout << "Received: " << inBuffer << std::endl;
+
+			// Wait 1 second
+			Sleep(1000);
+
+			// Send
+			bytes = sendto(s, pongString.c_str(), (int)pongString.size() + 1, 0, (sockaddr*)&fromAddr, fromAddrLen);
+			if (bytes == SOCKET_ERROR) {
+				printWSErrorAndExit("sendto");
+			}
+
+			std::cout << "Sent: '" << pongString.c_str() << "' sent" << std::endl;
+		}
+		else
+		{
+			printWSErrorAndExit("recvfrom");
+		}
 	}
 
-	// TODO-6: Close socket
+	// Close socket
+	closesocket(s);
 
-	// TODO-7: Winsock shutdown
+	// Winsock shutdown
+	WSACleanup();
 }
 
 int main(int argc, char **argv)
