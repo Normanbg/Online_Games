@@ -7,9 +7,22 @@ bool  ModuleNetworkingClient::start(const char * serverAddressStr, int serverPor
 
 	// TODO(jesus): TCP connection stuff
 	// - Create the socket
+	client_socket = socket(AF_INET, SOCK_STREAM, 0);
+	if (client_socket == INVALID_SOCKET) {
+		reportError("socket");
+	}
 	// - Create the remote address object
+	const int serverAddrLen = sizeof(serverAddress);
+	serverAddress.sin_family = AF_INET; // IPv4
+	inet_pton(AF_INET, serverAddressStr, &serverAddress.sin_addr);
+	serverAddress.sin_port = htons(serverPort); // Port
 	// - Connect to the remote address
+	int connectRes = connect(client_socket, (const sockaddr*)&serverAddress, serverAddrLen);
+	if (connectRes == SOCKET_ERROR) {
+		reportError("connect");
+	}
 	// - Add the created socket to the managed list of sockets using addSocket()
+	addSocket(client_socket);
 
 	// If everything was ok... change the state
 	state = ClientState::Start;
@@ -26,7 +39,26 @@ bool ModuleNetworkingClient::update()
 {
 	if (state == ClientState::Start)
 	{
+		// Input buffer
+		const int inBufferLen = 1300;
+		char inBuffer[inBufferLen];
 		// TODO(jesus): Send the player name to the server
+		int bytes = send(client_socket, playerName.c_str(), (int)playerName.size() + 1, 0);
+		if (bytes > 0)
+		{
+			// Receive
+			bytes = recv(client_socket, inBuffer, inBufferLen, 0);
+			if (bytes == SOCKET_ERROR) {
+				reportError("recv");
+			}
+			// Wait 1 second
+			Sleep(1000);
+		}
+		else
+		{
+			int err = WSAGetLastError();
+			reportError("send");
+		}
 	}
 
 	return true;
