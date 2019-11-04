@@ -1,8 +1,6 @@
 #pragma once
-#include <list>
-#include <vector>
 
-class OutputMemoryStream;
+#define MAX_CHAR_INPUT_CHAT 64
 
 class ModuleNetworking : public Module
 {
@@ -17,8 +15,7 @@ private:
 	bool preUpdate() override;
 
 	bool cleanUp() override;
-
-
+;
 
 	//////////////////////////////////////////////////////////////////////
 	// Socket event callbacks
@@ -28,23 +25,23 @@ private:
 
 	virtual void onSocketConnected(SOCKET socket, const sockaddr_in &socketAddress) { }
 
-	virtual void onSocketReceivedData(SOCKET s, const InputMemoryStream &packet) = 0;
+	virtual void onSocketReceivedData(SOCKET s,const InputMemoryStream &packet) = 0;
 
 	virtual void onSocketDisconnected(SOCKET s) = 0;
 
 
+	
 
 protected:
 
 	std::vector<SOCKET> sockets;
+	std::vector<SOCKET> disconnectedSockets;
 
 	void addSocket(SOCKET socket);
 
 	void disconnect();
 
+	bool sendPacket(const OutputMemoryStream &packet, SOCKET socket);
 	static void reportError(const char *message);
-
-	static bool sendPacket(const OutputMemoryStream & packet, SOCKET socket);
-
 };
 

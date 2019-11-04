@@ -1,11 +1,15 @@
 #pragma once
 
 #include "ModuleNetworking.h"
-
 class ModuleNetworkingClient : public ModuleNetworking
 {
 public:
+	struct ChatMsg {
 
+		ChatMsg(std::string _chat, int _color) : txt(_chat), color(_color) {};		
+		std::string txt;
+		int color = 0; //0 white, 1 red, 2 blue
+	};
 	//////////////////////////////////////////////////////////////////////
 	// ModuleNetworkingClient public methods
 	//////////////////////////////////////////////////////////////////////
@@ -26,7 +30,9 @@ private:
 
 	bool gui() override;
 
+	void sendToChat(const char* txt, int color);
 
+	void clearChat();
 
 	//////////////////////////////////////////////////////////////////////
 	// ModuleNetworking virtual methods
@@ -52,11 +58,11 @@ private:
 	ClientState state = ClientState::Stopped;
 
 	sockaddr_in serverAddress = {};
-	SOCKET socketClient = INVALID_SOCKET;
+	SOCKET _socket = INVALID_SOCKET;
+
+	std::vector<ChatMsg> chat;
 
 	std::string playerName;
-	std::string message;
-
-	std::vector<std::string> messages;
+	char chatTxt[MAX_CHAR_INPUT_CHAT];
 };
 

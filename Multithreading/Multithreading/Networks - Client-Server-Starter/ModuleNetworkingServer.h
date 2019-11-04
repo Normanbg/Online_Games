@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ModuleNetworking.h"
+#define MAX_SOCKETS 16
 
 class ModuleNetworkingServer : public ModuleNetworking
 {
@@ -32,11 +33,12 @@ private:
 	// ModuleNetworking virtual methods
 	//////////////////////////////////////////////////////////////////////
 
+public:
 	bool isListenSocket(SOCKET socket) const override;
 
 	void onSocketConnected(SOCKET socket, const sockaddr_in &socketAddress) override;
 
-	void onSocketReceivedData(SOCKET socket, const InputMemoryStream &packet) override;
+	void onSocketReceivedData(SOCKET socket , const InputMemoryStream &packet) override;
 
 	void onSocketDisconnected(SOCKET socket) override;
 
@@ -64,7 +66,6 @@ private:
 	};
 
 	std::vector<ConnectedSocket> connectedSockets;
-
 	bool checkName(ConnectedSocket socket);
 };
 

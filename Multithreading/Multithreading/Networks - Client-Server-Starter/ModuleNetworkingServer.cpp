@@ -9,48 +9,39 @@
 
 bool ModuleNetworkingServer::start(int port)
 {
-	int ret = 0;
 	// TODO(jesus): TCP listen socket stuff
 	// - Create the listenSocket
-	listenSocket = socket(AF_INET, SOCK_STREAM, 0);
-	if (listenSocket == INVALID_SOCKET)
-	{
-		reportError("Server Error Creating the Socket");
+	listenSocket = socket(AF_INET, SOCK_STREAM, 0); // IPv4, TCP socket
+	if (listenSocket == INVALID_SOCKET) {
+		reportError("Server error: Error creating listening socket, INVALID_SOCkET");
 	}
-
 	// - Set address reuse
 	int enable = 1;
-	ret = setsockopt(listenSocket, SOL_SOCKET, SO_REUSEADDR, (const char*)&enable, sizeof(int));
-	if (ret == SOCKET_ERROR)
-	{
-		reportError("Server Error Enabling the Socket");
+	int iResult = setsockopt(listenSocket, SOL_SOCKET, SO_REUSEADDR, (const char*)&enable, sizeof(int));
+	if (iResult != NO_ERROR) {//error case	
+		reportError("Server error: Error reusing socket's address");
 	}
+	sockaddr_in addressBound;
+	addressBound.sin_family = AF_INET; //IPv4
+	addressBound.sin_port = htons(port);
+	addressBound.sin_addr.S_un.S_addr = INADDR_ANY;
 
 	// - Bind the socket to a local interface
-	sockaddr_in bindAddr;
-	bindAddr.sin_family = AF_INET;
-	bindAddr.sin_port = htons(port);
-	bindAddr.sin_addr.S_un.S_addr = INADDR_ANY;
-
-	ret = bind(listenSocket, (const sockaddr*)&bindAddr, sizeof(bindAddr));
-	if (ret == SOCKET_ERROR)
-	{
-		reportError("Server Error Binding the Socket");
+	iResult = bind(listenSocket, (const sockaddr*)&addressBound, sizeof(addressBound));//bind socket with address
+	if (iResult != NO_ERROR) {//error case	
+		reportError("Server error: Error binding socket's address");
 	}
-	   
+
 	// - Enter in listen mode
-	ret = listen(listenSocket, 5);
-	if (ret == SOCKET_ERROR)
-	{
-		reportError("Server Error Listening");
+	iResult = listen(listenSocket, MAX_SOCKETS); ///EXLUSIVE OF TCP SOCKETS (listen, accept, connect)
+	if (iResult != NO_ERROR) {//error case	
+		reportError("Server error: Error listening socket");
 	}
-	else
-	{
-		// - Add the listenSocket to the managed list of sockets using addSocket()
-		addSocket(listenSocket);
 
-		state = ServerState::Listening;
-	}
+	// - Add the listenSocket to the managed list of sockets using addSocket()
+	addSocket(listenSocket);
+
+	state = ServerState::Listening;
 
 	return true;
 }
@@ -127,54 +118,92 @@ void ModuleNetworkingServer::onSocketConnected(SOCKET socket, const sockaddr_in 
 	connectedSocket.socket = socket;
 	connectedSocket.address = socketAddress;
 	connectedSockets.push_back(connectedSocket);
+
 }
 
 void ModuleNetworkingServer::onSocketReceivedData(SOCKET socket, const InputMemoryStream &packet)
 {
 	ClientMessage clientMessage;
 	packet >> clientMessage;
+	if (clientMessage == ClientMessage::Hello) {
 
-	if (clientMessage == ClientMessage::Hello)
-	{
-		std::string playername;
-		packet >> playername;
-
-		for (int i = 0; i < connectedSockets.size(); ++i)
+		std::string playerName;
+		packet >> playerName;
+		// Set the player name of the corresponding connected socket proxy
+		for (auto &connectedSocket : connectedSockets)
 		{
-			if (connectedSockets[i].socket == socket)
+			if (connectedSocket.socket == socket)
 			{
-				OutputMemoryStream _packet;
-				std::string welcom_message;
-				if (checkName(connectedSockets[i]))
-				{
-					connectedSockets[i].playerName = playername;
-					welcom_message = "Welcome, you have succesfully logged in.";
-					_packet << ServerMessage::Welcome;
+				connectedSocket.playerName = playerName; 
+				bool nameMatch = false;
+				nameMatch = checkName(connectedSocket);
+				
+				if (nameMatch) {
+					OutputMemoryStream warningNamePacket;//---------------USERNAME EXISTS MESSAGE
+					warningNamePacket << ServerMessage::UserNameExists;
+					std::string msg = std::string("Error Logging in: Name already in usage!");
+					warningNamePacket << msg;
+					if (!sendPacket(warningNamePacket, connectedSocket.socket))
+					{
+						reportError("sending warning name duplication message");
+					}	//-----------------				
 				}
-
-				_packet << welcom_message;
-
-				int ret = sendPacket(_packet, socket);
-				if (ret == SOCKET_ERROR)
-				{
-					reportError("Error Sending Welcom Packet");
+				else {//if name already exists.
+					OutputMemoryStream welcomePacket; //---------------WELCOME MESSAGE
+					welcomePacket << ServerMessage::Welcome;
+					std::string msg = std::string("Welcome to the chat");
+					welcomePacket << msg; 
+					int color = 3;//yellow color
+					welcomePacket << color;
+					bool colorRed = false;
+					welcomePacket << colorRed;
+					if (!sendPacket(welcomePacket, connectedSocket.socket))
+					{
+						reportError("sending welcome message");
+					}
+					//-----------------
+					OutputMemoryStream userJoinPacket; //---------------USER JOIN MESSAGE
+					userJoinPacket << ServerMessage::UserJoin;
+					std::string msg2 = std::string(connectedSocket.playerName + " joined the chat.");
+					userJoinPacket << msg2; 
+					int color2 = 2;//blue color
+					userJoinPacket << color2;
+					for (auto &connectedSocket2 : connectedSockets) {
+						if (connectedSocket2.socket != connectedSocket.socket) {
+							if (!sendPacket(userJoinPacket, connectedSocket2.socket))
+							{
+								reportError("sending left chat message");
+							}
+						}
+					}
+					//------------------
 				}
 			}
-		}
+		}		
+	}
+	if (clientMessage == ClientMessage::SendChatMsg) {
+		std::string sender = std::string();
+		char txt[MAX_CHAR_INPUT_CHAT];
+		memset(txt, 0, IM_ARRAYSIZE(txt));
+		packet >> sender;
+		packet >> txt; 
 
-		for (int i = 0; i < connectedSockets.size(); ++i)
-		{
-			OutputMemoryStream _packet;
-			_packet << ServerMessage::NewUser;
+		OutputMemoryStream chatTxtPacket;
+		chatTxtPacket << ServerMessage::ReceiveChatMsg;
+		
+		chatTxtPacket << sender;
+		chatTxtPacket << txt;
+		int  color =0;//white color
+		chatTxtPacket << color;
 
-			std::string newuser_message = playername + " has connected";
-			_packet << newuser_message;
 
-			int ret = sendPacket(_packet, socket);
-			if (ret == SOCKET_ERROR)
-			{
-				reportError("Error Sending new user Packet");
-			}
+		for (auto &connectedSocket : connectedSockets) {
+			
+				if (!sendPacket(chatTxtPacket, connectedSocket.socket))
+				{
+					reportError("sending chat message");
+				}
+			
 		}
 	}
 }
@@ -192,6 +221,7 @@ bool ModuleNetworkingServer::checkName(ConnectedSocket socket)
 	return true;
 }
 
+
 void ModuleNetworkingServer::onSocketDisconnected(SOCKET socket)
 {
 	// Remove the connected socket from the list
@@ -199,9 +229,21 @@ void ModuleNetworkingServer::onSocketDisconnected(SOCKET socket)
 	{
 		auto &connectedSocket = *it;
 		if (connectedSocket.socket == socket)
-		{
+		{			
+			OutputMemoryStream userLeftPacket; //-----------------USER LEFT MESSAGE
+			userLeftPacket << ServerMessage::UserLeft;
+			std::string msg = std::string((*it).playerName + " left the chat.");
+			userLeftPacket << msg;
 			connectedSockets.erase(it);
-			break;
+			int color2 = 2;//blue color
+			userLeftPacket << color2;
+			for (auto &connectedSocket2 : connectedSockets) {
+				if (!sendPacket(userLeftPacket, connectedSocket2.socket))
+				{
+					reportError("sending left chat message");
+				}
+			}
+			break;//-----------------
 		}
 	}
 }
