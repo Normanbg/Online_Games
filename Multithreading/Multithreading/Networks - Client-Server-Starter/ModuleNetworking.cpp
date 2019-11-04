@@ -134,7 +134,7 @@ bool ModuleNetworking::preUpdate()
 				}
 				else
 				{
-					ret = recv(sockets[i], (char*)incomingDataBuffer, packet.GetCapacity(), 0);
+					ret = recv(sockets[i], (char*)packet.GetBufferPtr(), packet.GetCapacity(), 0);
 
 					if (ret == SOCKET_ERROR && WSAGetLastError() != WSAECONNRESET)
 					{
@@ -143,7 +143,7 @@ bool ModuleNetworking::preUpdate()
 					}
 					else
 					{
-						if (ret == 0 || && WSAGetLastError() != WSAECONNRESET)
+						if (ret == 0 || WSAGetLastError() != WSAECONNRESET)
 						{
 							// TODO(jesus): handle disconnections. Remember that a socket has been
 							// disconnected from its remote end either when recv() returned 0,

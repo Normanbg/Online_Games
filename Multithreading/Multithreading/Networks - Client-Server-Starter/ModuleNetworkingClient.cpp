@@ -46,16 +46,37 @@ bool ModuleNetworkingClient::isRunning() const
 
 bool ModuleNetworkingClient::update()
 {
+	OutputMemoryStream packet;
 	if (state == ClientState::Start)
 	{
-		// TODO(jesus): Send the player name to the server
-		int ret = send(socketClient, playerName.c_str(), playerName.size(), 0);
-		if (ret == SOCKET_ERROR)
+		packet << ClientMessage::Hello;
+		packet << playerName;
+
+		if (sendPacket(packet, socketClient))
 		{
-			reportError("Client Error sending Name");
+			state = ClientState::Logging;
+		}
+		else
+		{
+			disconnect();
+			state = ClientState::Stopped;
 		}
 	}
 
+	if (state == ClientState::Logging)
+	{
+		if (message.length() > 0)
+		{
+			packet << ClientMessage::Send;
+			packet << message;
+		}
+
+		if (!sendPacket(packet, socketClient))
+		{
+			disconnect();
+			state = ClientState::Stopped;
+		}
+	}
 	return true;
 }
 
@@ -76,6 +97,21 @@ bool ModuleNetworkingClient::gui()
 			onSocketDisconnected(socketClient);
 			shutdown(socketClient, 2);
 		}
+		ImGui::BeginChild("Chat:", ImVec2(350, 450), true);
+		for (int i = 0; i < messages.size(); ++i)
+		{
+			ImGui::Text("%s", messages[i].c_str());
+		}
+		ImGui::EndChild();
+
+		char buff[1024] = "\0";
+
+		if (ImGui::InputText("Chat", buff, 1024, ImGuiInputTextFlags_EnterReturnsTrue))
+		{
+			std::string message(buff);
+			DLOG("%s", message.c_str());
+		}
+
 
 		ImGui::End();
 	}
@@ -83,9 +119,41 @@ bool ModuleNetworkingClient::gui()
 	return true;
 }
 
-void ModuleNetworkingClient::onSocketReceivedData(SOCKET socket, byte * data)
+void ModuleNetworkingClient::onSocketReceivedData(SOCKET socket, const InputMemoryStream &packet)
 {
-	state = ClientState::Stopped;
+	ServerMessage serverMessage;
+	packet >> serverMessage;
+
+	switch (serverMessage) {
+	case ServerMessage::Welcome: {
+		std::string msg = std::string();
+		packet >> msg;
+		bool colorRed = true;
+		packet >> colorRed;
+		LOG(msg.c_str());
+		break;
+	}
+	case ServerMessage::UserNameExists: {
+		std::string msg = std::string();
+		packet >> msg;
+		ELOG(msg.c_str());
+		onSocketDisconnected(socket);
+		state = ClientState::Stopped;
+		break;
+	}
+	/*case ServerMessage::UserLeft: {
+		std::string msg = std::string();
+		packet >> msg;
+		LOG(msg.c_str());
+		break;
+	}
+	case ServerMessage::UserJoin: {
+		std::string msg = std::string();
+		packet >> msg;
+		LOG(msg.c_str());
+		break;
+	}*/
+	}
 }
 
 void ModuleNetworkingClient::onSocketDisconnected(SOCKET socket)

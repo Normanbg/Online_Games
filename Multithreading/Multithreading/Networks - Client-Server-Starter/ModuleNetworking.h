@@ -1,6 +1,8 @@
 #pragma once
 #include <list>
+#include <vector>
 
+class OutputMemoryStream;
 
 class ModuleNetworking : public Module
 {
@@ -30,8 +32,6 @@ private:
 
 	virtual void onSocketDisconnected(SOCKET s) = 0;
 
-	static bool sendPacket(const OutputMemoryStream & packet, SOCKET socket);
-
 
 
 protected:
@@ -45,5 +45,6 @@ protected:
 	static void reportError(const char *message);
 
 	static bool sendPacket(const OutputMemoryStream & packet, SOCKET socket);
+
 };
 

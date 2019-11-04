@@ -129,16 +129,67 @@ void ModuleNetworkingServer::onSocketConnected(SOCKET socket, const sockaddr_in 
 	connectedSockets.push_back(connectedSocket);
 }
 
-void ModuleNetworkingServer::onSocketReceivedData(SOCKET socket, byte * data)
+void ModuleNetworkingServer::onSocketReceivedData(SOCKET socket, const InputMemoryStream &packet)
 {
-	// Set the player name of the corresponding connected socket proxy
-	for (auto &connectedSocket : connectedSockets)
+	ClientMessage clientMessage;
+	packet >> clientMessage;
+
+	if (clientMessage == ClientMessage::Hello)
 	{
-		if (connectedSocket.socket == socket)
+		std::string playername;
+		packet >> playername;
+
+		for (int i = 0; i < connectedSockets.size(); ++i)
 		{
-			connectedSocket.playerName = (const char *)data;
+			if (connectedSockets[i].socket == socket)
+			{
+				OutputMemoryStream _packet;
+				std::string welcom_message;
+				if (checkName(connectedSockets[i]))
+				{
+					connectedSockets[i].playerName = playername;
+					welcom_message = "Welcome, you have succesfully logged in.";
+					_packet << ServerMessage::Welcome;
+				}
+
+				_packet << welcom_message;
+
+				int ret = sendPacket(_packet, socket);
+				if (ret == SOCKET_ERROR)
+				{
+					reportError("Error Sending Welcom Packet");
+				}
+			}
+		}
+
+		for (int i = 0; i < connectedSockets.size(); ++i)
+		{
+			OutputMemoryStream _packet;
+			_packet << ServerMessage::NewUser;
+
+			std::string newuser_message = playername + " has connected";
+			_packet << newuser_message;
+
+			int ret = sendPacket(_packet, socket);
+			if (ret == SOCKET_ERROR)
+			{
+				reportError("Error Sending new user Packet");
+			}
 		}
 	}
+}
+
+
+bool ModuleNetworkingServer::checkName(ConnectedSocket socket)
+{
+	for (int i = 0; i < connectedSockets.size(); ++i)
+	{
+		if (socket.playerName == connectedSockets[i].playerName)
+		{
+			return false;
+		}
+	}
+	return true;
 }
 
 void ModuleNetworkingServer::onSocketDisconnected(SOCKET socket)
