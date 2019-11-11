@@ -82,6 +82,14 @@ public:
 		Write( inString.data(), elementCount * sizeof( char ) );
 	}
 
+	// Write for vec2
+	void Write(const vec2& vec) {
+		float it = vec.x;
+		Write(it);
+		it = vec.y;
+		Write(it);
+	}
+
 	// Generic operator <<
 	template< typename T >
 	OutputMemoryStream &operator<<(const T &data) {
@@ -181,6 +189,15 @@ public:
 		for (auto &character : inString) {
 			Read(character);
 		}
+	}
+
+	//Read for vec2
+	void Read(vec2& vec) const {
+		float f = 0;
+		Read(f);
+		vec.x = f;
+		Read(f);
+		vec.y = f;
 	}
 
 	// Generic operator >>
