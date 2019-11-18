@@ -23,22 +23,24 @@ void ReplicationManagerServer::write(OutputMemoryStream & packet)
 	{
 		if (it.second != ReplicationAction::None)
 		{
-			GameObject* gameObject = App->modLinkingContext->getNetworkGameObject(it.first);
+			GameObject* g = App->modLinkingContext->getNetworkGameObject(it.first);
 			packet << it.first;
-			packet << it.second;
+			int actionId = int(it.second);
+			packet << actionId; // store the action if it is not "none"
 			if (it.second == ReplicationAction::Create)
 			{
-				packet << gameObject->position;
-				packet << gameObject->angle;
-				packet << gameObject->size;
-				packet << gameObject->texture->filename;
+				packet << g->position;
+				packet << g->angle;
+				packet << g->size;
+				packet << g->size;
+				std::string textureDir = std::string(g->texture->filename);
+				packet << textureDir;
 			}
 			else if (it.second == ReplicationAction::Update) 
 			{
-				packet << gameObject->position;
-				packet << gameObject->angle;
+				packet << g->position;
+				packet << g->angle;
 			}
-
 		}
 	}
 	replicationCommands.clear();

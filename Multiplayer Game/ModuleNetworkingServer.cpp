@@ -210,7 +210,7 @@ void ModuleNetworkingServer::onUpdate()
 				if (Time.time - clientProxy.lastPacketReceivedTime > DISCONNECT_TIMEOUT_SECONDS)
 				{
 					ELOG("Client connection disconnected, timeout.");
-					Destroy(clientProxy.gameObject);
+					NetworkDestroy(clientProxy.gameObject);
 					destroyClientProxy(&clientProxy); //-------------------------CHECK!!!
 					break;
 				}
@@ -230,7 +230,7 @@ void ModuleNetworkingServer::onUpdate()
 				clientProxy.secondsSinceLastReplication += Time.deltaTime;
 				if (clientProxy.secondsSinceLastReplication > replicationDeliveryIntervalSeconds) 
 				{
-					if (!clientProxy.replicationManagerServer.replicationCommands.empty())
+					if (clientProxy.replicationManagerServer.replicationCommands.size() > 0)
 					{
 						OutputMemoryStream repPacket;
 						repPacket << ServerMessage::Replication;
